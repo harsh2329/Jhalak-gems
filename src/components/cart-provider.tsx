@@ -8,6 +8,7 @@ type CartContextType = {
   items: CartLine[];
   add: (product: GemProduct) => void;
   remove: (id: string) => void;
+  updateQuantity: (id: string, quantity: number) => void;
   clear: () => void;
   count: number;
   total: number;
@@ -28,10 +29,12 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const value = useMemo(() => ({
     items,
     add: (product: GemProduct) => setItems(current => {
-      if (current.some(x => x.product.id === product.id)) return current;
+      const found = current.find(x => x.product.id === product.id);
+      if (found) return current.map(x => x.product.id === product.id ? { ...x, quantity: Math.min(x.quantity + 1, Math.max(product.stock, 1)) } : x);
       return [...current, { product, quantity: 1 }];
     }),
     remove: (id: string) => setItems(current => current.filter(x => x.product.id !== id)),
+    updateQuantity: (id: string, quantity: number) => setItems(current => quantity < 1 ? current.filter(x => x.product.id !== id) : current.map(x => x.product.id === id ? { ...x, quantity: Math.min(quantity, Math.max(x.product.stock, 1)) } : x)),
     clear: () => setItems([]),
     count: items.reduce((sum, item) => sum + item.quantity, 0),
     total: items.reduce((sum, item) => sum + item.product.price * item.quantity, 0)
