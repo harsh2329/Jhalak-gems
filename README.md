@@ -1,78 +1,111 @@
-# Jhalak Gems — Website starter
+# Jhalak Gems
 
-A premium gemstone e-commerce starter for Jhalak Gems, Chandkheda, Ahmedabad.
+Premium gemstone storefront built with Next.js 15, React 19, TypeScript, Prisma and PostgreSQL. Includes a responsive storefront, catalogue/search/filtering, interactive 3D demo viewer, persistent cart, database-backed admin catalogue and orders, and Razorpay checkout/webhook endpoints.
 
-## Included in this starter
+> **Launch status:** This is a deployable application codebase, not a configured live shop. You must supply the database, admin credentials, Razorpay merchant keys, real product information, store policies and domain. Demo gemstone records and their photos/models are illustrative placeholders and must not be sold as verified inventory.
 
-- Premium emerald/charcoal/champagne visual direction
-- Responsive storefront and product catalogue
-- Search, category and price filtering
-- Product detail route
-- Browser-side demo cart (localStorage)
-- Admin inventory screen with demo product CRUD
-- Product SKU, carat, shape, treatment, origin and certificate fields
-- CSS gemstone hero visual
-- Interactive product-page 3D viewer using Google `<model-viewer>`
-- Three locally bundled faceted GLB demonstration gemstone models (emerald, sapphire, ruby)
-- Prisma/PostgreSQL data model for users, roles, products, inventory, orders, payments, shipments, certificates and audit logs
-- Server-side checkout and Razorpay webhook scaffolding with explicit configuration guards
+## Requirements
 
-## Important status
+- Node.js 20.9+ (Node 22 LTS recommended)
+- PostgreSQL database (Neon, Supabase or Render PostgreSQL)
+- Razorpay merchant account for online payments (start in Test Mode)
 
-This is a **development starter / functional UI prototype**, not a live store. The newly added 3D models are generic demonstration meshes, not photogrammetry scans of Jhalak Gems inventory. Replace each model URL with a model captured from the actual physical stone before representing it as an exact product preview. The sample products and prices are illustrative. Cart and admin changes in the current UI are demo/local browser state. Real authentication, persistent admin CRUD, shipping labels, email/WhatsApp notifications, certificate storage and live payment processing must be connected and tested before launch.
+## Local setup
 
-Do not accept real payments until merchant onboarding, legal policies, inventory reconciliation, webhook verification and end-to-end testing are complete.
+```bash
+cp .env.example .env.local
+npm install
+```
 
-## Run locally
+Fill `.env.local`:
 
-1. Install Node.js 20.9+.
-2. Extract this folder.
-3. Run `npm install`.
-4. Copy `.env.example` to `.env`.
-5. Configure a PostgreSQL database and `DATABASE_URL`.
-6. Run `npx prisma generate`.
-7. Run `npx prisma migrate dev --name init`.
-8. Run `npm run dev`.
-9. Open `http://localhost:3000`.
+- `DATABASE_URL`: PostgreSQL connection string.
+- `ADMIN_EMAIL`: admin sign-in email.
+- `ADMIN_PASSWORD`: long unique admin password.
+- `ADMIN_SESSION_SECRET`: random secret of at least 32 characters.
+- `CRON_SECRET`: separate random secret used to protect expired-stock reservation cleanup.
+- `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`: Razorpay test keys initially.
+- `RAZORPAY_WEBHOOK_SECRET`: webhook secret configured in Razorpay.
 
-## Netlify deployment starter
+Generate a strong session secret, for example:
 
-A `netlify.toml` is included for the Next.js build using the Netlify Next.js adapter. This repository still needs a Git remote, a connected Netlify site, environment variables, and a successful production build before a public deployment can be verified.
+```bash
+openssl rand -base64 48
+```
 
-## 3D viewer
+Prepare the database and sample catalogue:
 
-The product page loads the `@google/model-viewer` web component and local GLB files from `public/models/`. Visitors can rotate and zoom the demonstration model. The model viewer is not a substitute for a real stone scan; upload a product-specific GLB/GLTF to the media storage and set that product’s `model3d` URL.
+```bash
+npm run db:generate
+npm run db:push
+npm run db:seed
+npm run dev
+```
 
-## Recommended next implementation steps
+Open `http://localhost:3000`. Admin: `http://localhost:3000/admin`.
 
-1. Implement authentication and role-based access control (admin/manager/staff/customer).
-2. Replace demo catalogue with Prisma-backed product APIs.
-3. Persist inventory and use database transactions/locking for unique stones.
-4. Implement Razorpay order creation and signature verification.
-5. Verify Razorpay webhook signatures and make webhook processing idempotent.
-6. Add Cloudinary/S3 uploads with server-side file validation.
-7. Add Shiprocket integration after account approval.
-8. Add customer account, address book, order history, returns and refunds.
-9. Add consent-based email/WhatsApp notifications.
-10. Complete tax, invoice, privacy, shipping and returns policies with the business/CA.
-11. Test accessibility, mobile performance, security and full checkout on staging.
-12. Deploy only after owner approval and a successful test purchase.
+The seeded products are sample content. Replace names, images, prices, carat, origin, treatment and certification only with information confirmed by the store owner and physical product/certificates.
 
-## Brand and business details still required
+## Main routes
 
-- Approved logo and brand assets
-- Real gemstone inventory, actual product photos and certificates
-- Final product categories and attribute conventions
-- Pricing policy: fixed price, enquiry-only or hybrid
-- Store phone, email, business hours and exact address
-- Shipping coverage, insurance and delivery policy
-- Cancellation, return and refund policy
-- GST/tax and invoice requirements confirmed by the business/CA
-- Razorpay and shipping-provider merchant accounts
+| Route | Purpose |
+|---|---|
+| `/` | Store homepage and featured gemstones |
+| `/shop` | Live catalogue, search, category/price filters and sorting |
+| `/product/[slug]` | Product information and optional 3D demo viewer |
+| `/cart` | Browser-persisted shopping cart |
+| `/checkout` | Server-priced order creation and Razorpay checkout |
+| `/admin` | Admin sign-in, product creation/archive, order overview |
+| `GET /api/products` | Published products; demo fallback when no DB is configured |
+| `POST /api/products` | Admin-only product creation |
+| `PATCH/DELETE /api/products/:id` | Admin-only product update/archive |
+| `POST /api/admin/login` | Admin session creation |
+| `POST /api/admin/logout` | Admin session removal |
+| `POST /api/checkout` | Server-side price/stock validation, stock decrement and Razorpay order creation |
+| `POST /api/checkout/verify` | Verify Razorpay checkout signature |
+| `POST /api/webhooks/razorpay` | Verify webhook signature and reconcile payment/order status |
+| `GET /api/admin/orders` | Admin-only latest orders |
+| `GET /api/cron/release-reservations` | Secret-protected expiry cleanup for unpaid stock reservations; scheduled by Vercel every five minutes |
 
-## Folder map
+## Razorpay webhook
 
-- `src/app`: pages, API routes and global styles
-- `src/components`: storefront components
-- `src/lib`: demo data and helpers
-- `prisma/schema.prisma`: relational data model
+Configure a webhook in the Razorpay dashboard with URL:
+
+`https://YOUR_DOMAIN/api/webhooks/razorpay`
+
+Subscribe to `payment.captured` and `payment.failed`. Set the same webhook secret in `RAZORPAY_WEBHOOK_SECRET`. Test the entire payment and webhook lifecycle using Razorpay Test Mode before enabling live keys.
+
+## Deployment
+
+### Vercel (recommended for Next.js)
+
+1. Push this project to the `main` branch of GitHub.
+2. Import the repository into Vercel; use the Next.js preset and default build command `npm run build`.
+3. Add every required environment variable from `.env.example` in Project Settings → Environment Variables.
+4. Provision PostgreSQL, set `DATABASE_URL`, then run `npm run db:generate` and `npm run db:push` as part of the release/deployment workflow. Run `npm run db:seed` once if you want sample catalogue records.
+5. Deploy, verify `/`, `/shop`, `/admin`, product APIs, test payment and webhook.
+
+### Render
+
+Create a Node web service with build command `npm install && npm run db:generate && npm run build` and start command `npm start`. Add a managed PostgreSQL database and the environment variables. Run `npm run db:push` and optional `npm run db:seed` once after setting the database connection. Use a persistent release/pre-deploy command for migrations if your Render plan supports it.
+
+Netlify Next.js runtime support is available through the included Next plugin, but Vercel or Render is the simpler default for this server/API + Prisma application.
+
+## Important operational notes
+
+- Never commit `.env.local`, database URLs, Razorpay secrets or admin passwords.
+- Use HTTPS and Razorpay live keys only after test transactions, webhook verification, stock reconciliation and owner approval.
+- The current admin login uses a server-side environment credential and a signed, HTTP-only session cookie. Set a long unique password and rotate it if exposed. Add rate limiting/WAF protection before public production launch.
+- Checkout creates a 15-minute stock reservation inside a database transaction. Captured payment converts the reservation into a sale; failed payment releases it. The Vercel cron endpoint releases abandoned reservations after expiry (set `CRON_SECRET`); configure an equivalent scheduled request if deploying elsewhere. Configure and test webhook delivery/retries before taking live orders. Monitor pending orders and reconcile them with Razorpay.
+- Current product image URLs and GLB files are illustrative demo assets. Replace them with actual photographed items and real 3D scans/models. Do not imply demo models are scans of the physical gemstone.
+- Confirm GST/tax treatment, shipping, insurance, cancellation, returns, refunds, privacy policy, terms and product claims with the business owner/qualified professionals before launch.
+- The current implementation does not yet include customer accounts, password reset, automated shipping-provider integration, refunds UI, coupon management, file upload pipeline or inventory audit UI.
+
+## Quality checks
+
+```bash
+npm run lint
+npm run build
+```
+
+Run these after installing dependencies and configuring the environment. A successful build alone is not a substitute for checkout/webhook and inventory acceptance tests.

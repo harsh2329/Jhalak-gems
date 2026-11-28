@@ -1,0 +1,256 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  CUSTOMER
+  ADMIN
+  MANAGER
+  STAFF
+}
+
+enum ProductStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum OrderStatus {
+  PENDING_PAYMENT
+  PAID
+  CONFIRMED
+  PROCESSING
+  PACKED
+  SHIPPED
+  OUT_FOR_DELIVERY
+  DELIVERED
+  CANCELLED
+  RETURN_REQUESTED
+  RETURNED
+  REFUND_PENDING
+  REFUNDED
+}
+
+enum PaymentStatus {
+  CREATED
+  AUTHORIZED
+  CAPTURED
+  FAILED
+  REFUND_PENDING
+  REFUNDED
+}
+
+enum InventoryMovementType {
+  OPENING
+  PURCHASE
+  SALE
+  RESERVATION_RELEASE
+  ADJUSTMENT
+  RETURN
+}
+
+model User {
+  id           String     @id @default(cuid())
+  name         String?
+  email        String     @unique
+  phone        String?    @unique
+  passwordHash String?
+  role         UserRole   @default(CUSTOMER)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  orders       Order[]
+  addresses    Address[]
+  reviews      Review[]
+  auditLogs    AuditLog[] @relation("ActorAuditLogs")
+}
+
+model Address {
+  id          String   @id @default(cuid())
+  userId      String
+  name        String
+  phone       String
+  line1       String
+  line2       String?
+  city        String
+  state       String
+  pincode     String
+  country     String   @default("India")
+  isDefault   Boolean  @default(false)
+  user        User     @relation(fields: [userId], references: [id])
+  createdAt   DateTime @default(now())
+}
+
+model Category {
+  id        String    @id @default(cuid())
+  name      String
+  slug      String    @unique
+  imageUrl  String?
+  products  Product[]
+  createdAt DateTime  @default(now())
+}
+
+model Product {
+  id              String         @id @default(cuid())
+  sku             String         @unique
+  name            String
+  slug            String         @unique
+  description     String
+  categoryId      String
+  category        Category       @relation(fields: [categoryId], references: [id])
+  variety         String?
+  colour          String?
+  carat           Decimal?       @db.Decimal(8, 3)
+  shape           String?
+  dimensions      String?
+  origin          String?
+  treatment       String?
+  clarity         String?
+  certification   String?
+  pricePaise      Int
+  compareAtPaise  Int?
+  status          ProductStatus  @default(DRAFT)
+  isFeatured      Boolean        @default(false)
+  isTrending      Boolean        @default(false)
+  images          ProductImage[]
+  model3dUrl      String?
+  inventory       Inventory?
+  certificates    Certificate[]
+  orderItems      OrderItem[]
+  reviews         Review[]
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  @@index([categoryId, status])
+  @@index([pricePaise])
+}
+
+model ProductImage {
+  id        String  @id @default(cuid())
+  productId String
+  url       String
+  alt       String
+  sortOrder Int     @default(0)
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+}
+
+model Certificate {
+  id            String   @id @default(cuid())
+  productId     String
+  issuer        String
+  certificateNo String?
+  fileUrl       String
+  verifiedAt    DateTime?
+  product       Product  @relation(fields: [productId], references: [id])
+  createdAt     DateTime @default(now())
+}
+
+model Inventory {
+  id              String   @id @default(cuid())
+  productId       String   @unique
+  quantity        Int      @default(0)
+  reserved        Int      @default(0)
+  isUniqueStone   Boolean  @default(true)
+  product         Product  @relation(fields: [productId], references: [id])
+  movements       InventoryLog[]
+  updatedAt       DateTime @updatedAt
+}
+
+model InventoryLog {
+  id          String                 @id @default(cuid())
+  inventoryId String
+  type        InventoryMovementType
+  quantity    Int
+  reason      String
+  actorId     String?
+  inventory   Inventory              @relation(fields: [inventoryId], references: [id])
+  createdAt   DateTime               @default(now())
+}
+
+model Order {
+  id              String      @id @default(cuid())
+  orderNumber     String      @unique
+  userId          String?
+  user            User?       @relation(fields: [userId], references: [id])
+  status          OrderStatus @default(PENDING_PAYMENT)
+  subtotalPaise   Int
+  shippingPaise   Int         @default(0)
+  taxPaise        Int         @default(0)
+  totalPaise      Int
+  customerName    String
+  customerEmail   String?
+  customerPhone   String
+  shippingAddress Json
+  reservationExpiresAt DateTime?
+  items           OrderItem[]
+  payments        Payment[]
+  shipment        Shipment?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+}
+
+model OrderItem {
+  id               String  @id @default(cuid())
+  orderId          String
+  productId        String
+  order            Order   @relation(fields: [orderId], references: [id])
+  product          Product @relation(fields: [productId], references: [id])
+  skuSnapshot      String
+  nameSnapshot     String
+  pricePaise       Int
+  quantity         Int
+  attributesSnapshot Json
+}
+
+model Payment {
+  id                  String        @id @default(cuid())
+  orderId             String
+  order               Order         @relation(fields: [orderId], references: [id])
+  provider            String        @default("razorpay")
+  providerOrderId     String?       @unique
+  providerPaymentId   String?       @unique
+  status              PaymentStatus @default(CREATED)
+  amountPaise         Int
+  signatureVerified   Boolean       @default(false)
+  rawEvent            Json?
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+}
+
+model Shipment {
+  id              String   @id @default(cuid())
+  orderId         String   @unique
+  order           Order    @relation(fields: [orderId], references: [id])
+  provider        String?
+  awb             String?  @unique
+  trackingUrl     String?
+  status          String   @default("PENDING")
+  insured         Boolean  @default(false)
+  updatedAt       DateTime @updatedAt
+}
+
+model Review {
+  id        String   @id @default(cuid())
+  userId    String
+  productId String
+  rating    Int
+  comment   String?
+  approved  Boolean  @default(false)
+  user      User     @relation(fields: [userId], references: [id])
+  product   Product  @relation(fields: [productId], references: [id])
+  createdAt DateTime @default(now())
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  actorId   String?
+  actor     User?    @relation("ActorAuditLogs", fields: [actorId], references: [id])
+  action    String
+  entity    String
+  entityId  String
+  metadata  Json?
+  createdAt DateTime @default(now())
+}

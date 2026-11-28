@@ -1,0 +1,13 @@
+"use client";
+import { useEffect,useState } from 'react';
+import { useParams,notFound } from 'next/navigation';
+import Link from 'next/link';
+import { ArrowLeft,ShieldCheck,ShoppingBag } from 'lucide-react';
+import { products as demoProducts,type GemProduct } from '@/lib/products';
+import { useCart } from '@/components/cart-provider';
+import { GemstoneViewer } from '@/components/gemstone-viewer';
+export default function ProductPage(){const params=useParams<{slug:string}>();const [product,setProduct]=useState<GemProduct|undefined>(()=>demoProducts.find(p=>p.slug===params.slug));const [loaded,setLoaded]=useState(false);const {add}=useCart();
+ useEffect(()=>{let active=true;fetch(`/api/products/${encodeURIComponent(params.slug)}`).then(async r=>{if(!r.ok)throw new Error('not found');const d=await r.json();if(active)setProduct(d.product)}).catch(()=>{}).finally(()=>active&&setLoaded(true));return()=>{active=false}},[params.slug]);
+ if(!product&&loaded)return notFound();if(!product)return <main className="product-page wrap"><p>Loading gemstone details…</p></main>;
+ return <main className="product-page wrap"><Link href="/shop" className="back-link"><ArrowLeft size={15}/> Back to collection</Link><div className="product-detail-grid"><div className="detail-visual">{product.model3d&&<GemstoneViewer src={product.model3d} name={product.name}/>}<img className="detail-photo" src={product.image} alt={product.name}/></div><div className="detail-copy"><p className="eyebrow">{product.category} · {product.sku}</p><h1>{product.name}</h1><p className="detail-price">₹{product.price.toLocaleString('en-IN')}</p><p className="detail-description">{product.description}</p><div className="detail-stock"><span className="stock-dot"/>{product.stock>0?`Available · ${product.stock} in stock`:'Currently unavailable'}</div><button className="button button-gold add-button" disabled={product.stock<1} onClick={()=>add(product)}><ShoppingBag size={17}/> Add to bag</button><a className="text-link dark-link" href={`https://wa.me/?text=${encodeURIComponent(`Hello Jhalak Gems, I am interested in ${product.name} (${product.sku}). Please share verified details and availability.`)}`} target="_blank" rel="noreferrer">Ask about this stone ↗</a><div className="spec-table"><h3>Stone details</h3>{[['SKU',product.sku],['Gemstone',product.category],['Colour',product.colour],['Weight',`${product.carat} carat`],['Shape',product.shape],['Origin',product.origin],['Treatment',product.treatment],['Certification',product.certification]].map(([k,v])=><div key={k}><span>{k}</span><b>{v}</b></div>)}</div><p className="detail-disclaimer"><ShieldCheck size={15}/> Verify physical stone specifications and certificate before purchase.</p></div></div></main>;
+}

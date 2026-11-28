@@ -1,0 +1,9 @@
+import { PrismaClient } from '@prisma/client';
+const prisma=new PrismaClient();
+const products=[
+ {sku:'JG-EM-0001',name:'Verdant Emerald',slug:'verdant-emerald',category:'Emerald',colour:'Green',carat:3.25,shape:'Oval',price:18500,stock:1,image:'https://images.unsplash.com/photo-1617038220319-276d3cfab638?w=1000&q=85',model:'/models/emerald-demo.glb',description:'Sample catalogue entry. Verify all physical stone details before publishing.'},
+ {sku:'JG-SA-0002',name:'Midnight Sapphire',slug:'midnight-sapphire',category:'Sapphire',colour:'Blue',carat:2.1,shape:'Cushion',price:24500,stock:1,image:'https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?w=1000&q=85',model:'/models/sapphire-demo.glb',description:'Sample catalogue entry. Verify all physical stone details before publishing.'},
+ {sku:'JG-RU-0003',name:'Ruby Ember',slug:'ruby-ember',category:'Ruby',colour:'Red',carat:1.8,shape:'Oval',price:32000,stock:1,image:'https://images.unsplash.com/photo-1611652022419-a9419f74343d?w=1000&q=85',model:'/models/ruby-demo.glb',description:'Sample catalogue entry. Verify all physical stone details before publishing.'}
+];
+async function main(){for(const p of products){const category=await prisma.category.upsert({where:{slug:p.category.toLowerCase()},update:{},create:{name:p.category,slug:p.category.toLowerCase()}});await prisma.product.upsert({where:{sku:p.sku},update:{},create:{sku:p.sku,name:p.name,slug:p.slug,description:p.description,categoryId:category.id,colour:p.colour,carat:p.carat,shape:p.shape,origin:'Not verified',treatment:'Not specified',certification:'Not specified',pricePaise:p.price*100,status:'PUBLISHED',isFeatured:true,model3dUrl:p.model,images:{create:{url:p.image,alt:p.name}},inventory:{create:{quantity:p.stock,isUniqueStone:p.stock===1}}}});}}
+main().finally(()=>prisma.$disconnect());
